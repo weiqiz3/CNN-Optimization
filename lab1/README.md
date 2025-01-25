@@ -94,7 +94,7 @@ The remaining lines are commands that will be executed on the GPU node. The line
 #### Other useful slurm commands
 
 ```
-squeue -u <your net id>
+squeue -u <your ACCESS id>
 ```
 
 This command shows the status of your job. Occasionally, when the cluster is very busy, your job will potentially get stuck in the queue. You can use this command to check your job.
