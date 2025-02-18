@@ -24,11 +24,6 @@ You will be working on this project individually. We will release the code for p
 
 *You are expected to adhere to University of Illinois academic integrity standards. Do not attempt to subvert any of the performance-measurement aspects of the final project. If you are unsure about whether something does not meet those guidelines, ask a member of the teaching staff.*
 
-## Table of Contents
-
-* [Rubric](#rubric)
-* [Appendix](#appendix)
-
 
 ## Rubric
 
