@@ -20,7 +20,8 @@ Below is a brief introduction to the overall architecture of GPT-2. Note that yo
 #### Transformer Decoder Architecture
 Similar to [Transformer-Decoder](https://arxiv.org/abs/1801.10198) as shown in Figure below , GPT-2 is composed of stacked transformer decoder layers. Each decoder block contains Multi-Head Self-Attention, Feed-Forward Network (FFN) and Layer Normalization and Residual Connections. GPT-2's full model consists of 48 transformer layers (blocks) for the 1.5 billion parameter version. 
 <!-- These layers are stacked on top of each other to create a deep network capable of capturing complex dependencies and linguistic features. In this project, we use . -->
-![Alt text](assets/transformer-decoder.png "Transformer-Decoder")
+![image](https://github.com/user-attachments/assets/278102ff-fa2c-4649-84d5-85c3fd476f73)
+
 
 #### Multi-Head Self-Attention Mechanism
 GPT-2 uses Multi-Head self-attention to attend to all previous tokens in the sequence to predict the next token. The model processes the input sequence and computes attention scores for each token, based on its relationships with the other tokens in the sequence. In multi-head self-attention, we perform the self-attention mechanism `h` times, where each head learns its own set of W<sub>Q</sub><sup>(h)</sup>, W<sub>K</sub><sup>(h)</sup>, and W<sub>V</sub><sup>(h)</sup> weight matrices.
