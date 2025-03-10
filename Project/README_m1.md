@@ -147,7 +147,7 @@ The convolution forward process consists of the following steps:
 
 In lecture 12, we covered how to unroll the input features for a single image. To unroll a batch of images, the unrolled matrix for each image in the batch should be concatenated along the row dimension. In other words, if the unrolled matrix of a single image has a shape of `H` x `W`, then the unrolled matrix of a batch of images would have a shape of `H` x `Batch * W`.
 
-The correct size of the unrolled matrix is `Channel * K * K` x `Batch * Height_out * Width_out`.
+The correct size of the unrolled matrix is `Channel * K * K` x `Batch * Height_out * Width_out`. Be aware that when the batch size is 10,000, the unrolled matrix's size exceeds `INT_MAX`. Consider using `size_t` for indexing.
 
 Then, you will view the mask as a `Map_out` x `Channel * K * K` matrix, and multiply it with the unrolled matrix. The output feature map initially has the shape `Map_out` x `Batch` x `Height_out` x `Width_out`, which needs to be permuted to `Batch` x `Map_out` x `Height_out` x `Width_out`.
 
