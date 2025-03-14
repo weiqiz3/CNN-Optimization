@@ -3,11 +3,13 @@
 
 In this second milestone, you will build upon the **basic CPU convolution, GPU convolution, and matrix unrolling** you completed in Milestone 1. Your tasks now include **profiling** those implementations and introducing a **kernel fusion** optimization.
 
+Before starting Milestone 2, please watch the recorded profiling lecture available on the Canvas syllabus page. Although the lecture is scheduled for Week 10, you can view it at any time.
+
 ## Table of Contents
 - [Overview and Deliverables](#overview-and-deliverables)
 - [Setup](#setup)
 - [1. Profiling Basic CPU Convolution](#1-profiling-basic-cpu-convolution)
-- [2. Profiling Basic GPU Convolution and matrix unrolling](#2-profiling-basic-gpu-convolution-and-matrix-unrolling)
+- [2. Profiling Basic GPU Convolution and Matrix Unrolling](#2-profiling-basic-gpu-convolution-and-matrix-unrolling)
 - [3. Implementing Kernel Fusion](#3-implementing-kernel-fusion)
 - [4. Submitting Milestone 2 for Grading](#4-submitting-milestone-2-for-grading)
 - [Rubric](#rubric)
@@ -173,7 +175,7 @@ For regular development and debugging, use the standard configuration:
 #SBATCH --constraint="projects"
 ```
 
-**Note:** Only use the profiling configuration when actively collecting performance metrics. Using the standard configuration during development helps maintain resource availability for other cluster users by avoiding unnecessary exclusive node allocation.
+**Note:** Only use the profiling configuration when actively collecting performance metrics. The `perf,nvperf` constraints instruct Delta to reserve a dedicated 4×A40 node for your job. This ensures that no other processes interfere with profiling but may result in longer wait times for node allocation. Using the standard configuration during development helps maintain resource availability for other cluster users by avoiding unnecessary exclusive node allocation.
 
 Nsight-Systems does not give you detailed kernel level performance metrics. For that, we will need to use `ncu` (Nsight-Compute).
 
@@ -185,7 +187,7 @@ Nsight-Systems does not give you detailed kernel level performance metrics. For 
 2. Download that `.ncu-rep` file locally to open in the **Nsight Compute GUI**.  
 3. Examine memory behavior, SM efficiency, etc. to find performance bottlenecks.
 
-
+You can find more information about `ncu` in the [Nsight Compute Documentation](https://docs.nvidia.com/nsight-compute/NsightCompute/index.html)
 
 ## 3. Implementing Kernel Fusion
 
