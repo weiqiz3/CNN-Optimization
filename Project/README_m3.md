@@ -107,7 +107,7 @@ For **Project Milestone 3**, you will need to submit your work across three plat
   - **Each** optimization you implemented should have each own folder with the following requirements:
     - name of the folder should have the following format:`req_#` or `op_#`. (see the optimization numbers in [optimizations](#optimizations))
     - it should contain an non-stacked version of your implementation
-      - a functional copy of `m3-forward.cu` with **ONLY** this implementation added on from the base m2 implementation
+      - a functional copy of `m3-forward.cu` with **ONLY** this implementation added on from the baseline (PM1 Unroll or PM2 as specified in the optimization table)
       - the code file must be named `m3-forward.cu`
       - we will perform functionality checks on every individual optimization
     - feel free to add more folders if needed.
