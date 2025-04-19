@@ -1,5 +1,5 @@
 #include <wb.h>
-
+#define BLOCKSIZE 256
 #define wbCheck(stmt)                                                     \
   do {                                                                    \
     cudaError_t err = stmt;                                               \
@@ -9,20 +9,29 @@
       return -1;                                                          \
     }                                                                     \
   } while (0)
-
 __global__ void spmvJDSKernel(float *out, int *matColStart, int *matCols,
                               int *matRowPerm, int *matRows,
                               float *matData, float *vec, int dim) {
   //@@ insert spmv kernel for jds format
+  int row = blockIdx.x * blockDim.x + threadIdx.x;
+  if (row < dim) {
+    float dot = 0;
+    unsigned int sec = 0;
+    while (sec < matRows[row]) {
+      dot += matData[matColStart[sec] + row] * vec[matCols[matColStart[sec] + row]];
+      sec++;
+    }
+    out[matRowPerm[row]] = dot;
+  }
 }
-
 static void spmvJDS(float *out, int *matColStart, int *matCols,
                     int *matRowPerm, int *matRows, float *matData,
                     float *vec, int dim) {
-
   //@@ invoke spmv kernel for jds format
+  dim3 DimGrid(ceil((float) dim / BLOCKSIZE), 1, 1);
+  dim3 DimBlock(BLOCKSIZE, 1, 1);
+  spmvJDSKernel<<<DimGrid, DimBlock>>>(out, matColStart, matCols, matRowPerm, matRows, matData, vec, dim);
 }
-
 int main(int argc, char **argv) {
   wbArg_t args;
   int *hostCSRCols;
@@ -44,33 +53,24 @@ int main(int argc, char **argv) {
   float *deviceOutput;
   int dim, ncols, nrows, ndata;
   int maxRowNNZ;
-
   args = wbArg_read(argc, argv);
-
   // Import data and create memory on host
   hostCSRCols = (int *)wbImport(wbArg_getInputFile(args, 0), &ncols, "Integer");
   hostCSRRows = (int *)wbImport(wbArg_getInputFile(args, 1), &nrows, "Integer");
   hostCSRData = (float *)wbImport(wbArg_getInputFile(args, 2), &ndata, "Real");
   hostVector = (float *)wbImport(wbArg_getInputFile(args, 3), &dim, "Real");
-
   hostOutput = (float *)malloc(sizeof(float) * dim);
-
-
-
   CSRToJDS(dim, hostCSRRows, hostCSRCols, hostCSRData, &hostJDSRowPerm, &hostJDSRows,
            &hostJDSColStart, &hostJDSCols, &hostJDSData);
   maxRowNNZ = hostJDSRows[0];
-
   // Allocate GPU memory.
   cudaMalloc((void **)&deviceJDSColStart, sizeof(int) * maxRowNNZ);
   cudaMalloc((void **)&deviceJDSCols, sizeof(int) * ndata);
   cudaMalloc((void **)&deviceJDSRowPerm, sizeof(int) * dim);
   cudaMalloc((void **)&deviceJDSRows, sizeof(int) * dim);
   cudaMalloc((void **)&deviceJDSData, sizeof(float) * ndata);
-
   cudaMalloc((void **)&deviceVector, sizeof(float) * dim);
   cudaMalloc((void **)&deviceOutput, sizeof(float) * dim);
-
 
   // Copy input memory to the GPU.
   cudaMemcpy(deviceJDSColStart, hostJDSColStart, sizeof(int) * maxRowNNZ,
