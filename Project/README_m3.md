@@ -307,3 +307,29 @@ Make sure you implement two required optimizations and additional optimizations 
      - Tensor Cores ( 10% - requires TF32; if using FP16, then at most 5% )
      - Other optimizations ( 10% ) ( 1% per optimization point )
 4. Extra Credit (1% per additional optimization point)
+
+
+## Competition
+
+**Deadline: May 9th, 8:00 PM CST.** The grace period does not apply to the competition.
+
+Optionally, you can compete performance of your convolution kernel with other students. We will award extra credits to top performers in this competition. The metric used for this competition will be the sum of OP Times for batch size of 10,000. You can monitor the current standings by accessing the `competition_rank.csv` file in your `_grade` branch within your GitHub repository. To enter the competition, create a file at `/Project/project/src/layer/custom/m3-competition.cu`, copy your optimized `m3-forward.cu` implementation into it, and push it to your GitHub repository.
+
+**Submission Requirements**
+
+The requirements for the competition are the same as the final code submission, including
+1. Only submissions with exactly correct accuracies are eligible for ranking.
+2. All GPU kernel calls must occur within the `conv_forward_gpu()` function.
+3. Your code must use a single stream.
+
+The leaderboard will be updated every 24 hours at night starting from May 7th, based on each valid submission. We will finalize the standing of each participant by taking the average of multiple runs. Note that it is also possible that some participants develop in private and submit their ranking at the last minute. So don't be surprised if you fall out of a certain bracket in the end.
+
+Extra credits are awarded based on both leaderboard rankings and Op Times. The sum of OP Times must be below 45ms to be eligible for the ranking points. The total extra credits are calculated as the sum of points earned from both categories.
+
+Rankings
+1. Rank 1-3 (1 point towards the final grade)
+2. Rank 4-10 (0.5 point towards the final grade)
+3. Rank 11-30 (0.25 point towards the final grade)
+
+Op Times
+1. Sum of OP times is less than 45 ms (0.25 point towards the final grade)
