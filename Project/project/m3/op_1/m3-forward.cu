@@ -1,17 +1,13 @@
 #include <cmath>
 #include <iostream>
 #include "gpu-new-forward.h"
-#include <mma.h>
-using namespace nvcuda;
-#define WMMA_M 16
-#define WMMA_N 16
-#define WMMA_K 8
-__global__ void matmul_conv_fused(const float *mask, const float *input, float *output,
-    int Batch, int Map_out, int Channel, int Height, int Width, int K)
+#define TILE_WIDTH 16
+__global__ void matmul_conv_fused(const float * __restrict__ mask, const float * __restrict__ input, float * __restrict__ output,
+                                  int Batch, int Map_out, int Channel, int Height, int Width, int K)
 {
     /*
     TODO: Modify this function to implement the fused unroll-matmul-permute kernel.
-
+    
     Function parameter definitions:
     mask - convolution kernel
     input - input
@@ -28,51 +24,42 @@ __global__ void matmul_conv_fused(const float *mask, const float *input, float *
     const int b = blockIdx.z;
     const int unrolled = Channel * K * K;
     const int hw = Height_out * Width_out;
-    const int by = blockIdx.y, bx = blockIdx.x, tx = threadIdx.x;
-    const int row = by * 2 * WMMA_M, col = bx * 2 * WMMA_N;
+    int by = blockIdx.y, bx = blockIdx.x, ty = threadIdx.y, tx = threadIdx.x;
+    int row = by * TILE_WIDTH + ty, col = bx * TILE_WIDTH + tx;
+    __shared__ float tileInput[TILE_WIDTH][TILE_WIDTH];
+    __shared__ float tileMask[TILE_WIDTH][TILE_WIDTH];
+    float p = 0;
     #define in_4d(i3, i2, i1, i0) input[(i3) * (Channel * Height * Width) + (i2) * (Height * Width) + (i1) * (Width) + i0]
-    #define out_4d(i3, i2, i1, i0) output[(i3) * (Map_out * Height_out * Width_out) + (i2) * (Height_out * Width_out) + (i1) * (Width_out) + i0]
-    __shared__ float tileInput[WMMA_K][2 * WMMA_N];
-    __shared__ float tileMask[2 * WMMA_M][WMMA_K];
-    __shared__ float tileOutput[2 * WMMA_M][2 * WMMA_N];
-    wmma::fragment<wmma::matrix_a, WMMA_M, WMMA_N, WMMA_K, wmma::precision::tf32, wmma::row_major> a_frag;
-    wmma::fragment<wmma::matrix_b, WMMA_M, WMMA_N, WMMA_K, wmma::precision::tf32, wmma::row_major> b_frag;
-    wmma::fragment<wmma::accumulator, WMMA_M, WMMA_N, WMMA_K, float> c_frag;
-    wmma::fill_fragment(c_frag, 0.0f);
-    for (int i = 0; i < ceil((float) unrolled / WMMA_K); i++) {
-        for (int j = 0; j < 2; j++) {
-            int r = WMMA_K * i + (j + 2 * tx) / (2 * WMMA_N), c = col + (j + 2 * tx) % (2 * WMMA_N);
-            if (r < unrolled && c < hw) {
-                const int p = (r - r / (K * K) * K * K) / K;
-                const int q = (r - r / (K * K) * K * K) % K;
-                tileInput[(j + 2 * tx) / (2 * WMMA_N)][(j + 2 * tx) % (2 * WMMA_N)] = wmma::__float_to_tf32(in_4d(b, r / (K * K), c / Width_out + p, c % Width_out + q));
-            } else {
-                tileInput[(j + 2 * tx) / (2 * WMMA_N)][(j + 2 * tx) % (2 * WMMA_N)] = wmma::__float_to_tf32(0);
-            }
-            r = row + (j + 2 * tx) / WMMA_K;
-            c = WMMA_K * i + (j + 2 * tx) % WMMA_K;
-            if (r < Map_out && c < unrolled) {
-                tileMask[(j + 2 * tx) / WMMA_K][(j + 2 * tx) % WMMA_K] = wmma::__float_to_tf32(mask[r * unrolled + c]);
-            } else {
-                tileMask[(j + 2 * tx) / WMMA_K][(j + 2 * tx) % WMMA_K] = wmma::__float_to_tf32(0);
-            }
+    for (int i = 0; i < ceil((float) unrolled / TILE_WIDTH); i++) {
+        int uv = i * TILE_WIDTH + ty;
+        if (uv < unrolled && col < hw) {
+            int c = uv / (K * K);
+            int rem = uv - c * (K * K);
+            int p = rem / K;
+            int q = rem % K;
+            int h = col / Width_out + p;
+            int w = col % Width_out + q;
+            tileInput[ty][tx] = (h < Height && w < Width) ? in_4d(b, c, h, w) : 0;
+        } else {
+            tileInput[ty][tx] = 0;
+        }
+        if (row < Map_out && TILE_WIDTH * i + tx < unrolled) {
+            tileMask[ty][tx] = mask[unrolled * row + TILE_WIDTH * i + tx];
+        } else {
+            tileMask[ty][tx] = 0;
         }
         __syncthreads();
-        wmma::load_matrix_sync(a_frag, &tileMask[tx / 64 * WMMA_M][0], WMMA_K);
-        wmma::load_matrix_sync(b_frag, &tileInput[0][tx / 32 % 2 * WMMA_N], 2 * WMMA_N);
-        wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
+        if (row < Map_out && col < hw) {
+            for (int k = 0; k < TILE_WIDTH; k++) {
+                p += tileMask[ty][k] * tileInput[k][tx];
+            }
+        }
         __syncthreads();
     }
-    wmma::store_matrix_sync(&tileOutput[tx / 64 * WMMA_M][tx / 32 % 2 * WMMA_N], c_frag, 2 * WMMA_N, wmma::mem_row_major);
-    __syncthreads();
-    for (int i = 0; i < 8; i++) {
-        const int r = row + (i + tx * 8) / (2 * WMMA_N), c = col + (i + tx * 8) % (2 * WMMA_N);
-        if (r < Map_out && c < hw) {
-            out_4d(b, r, c / Width_out, c % Width_out) = tileOutput[(i + tx * 8) / (2 * WMMA_N)][(i + tx * 8) % (2 * WMMA_N)];
-        }
+    if (row < Map_out && col < hw) {
+        output[Map_out * hw * b + hw * row + col] = p;
     }
     #undef in_4d
-    #undef out_4d
 }
 __host__ void GPUInterface::conv_forward_gpu_prolog(const float *host_output, const float *host_input, const float *host_mask, float **device_output_ptr, float **device_input_ptr, float **device_mask_ptr, const int Batch, const int Map_out, const int Channel, const int Height, const int Width, const int K)
 {
@@ -97,8 +84,8 @@ __host__ void GPUInterface::conv_forward_gpu(float *device_output, const float *
     // TODO: Set the kernel dimensions and call the fused kernel
     const int Height_out = Height - K + 1;
     const int Width_out = Width - K + 1;
-    dim3 DimGrid(ceil((float) Height_out * Width_out / (2 * WMMA_N)), ceil((float) Map_out / (2 * WMMA_M)), Batch);
-    dim3 DimBlock(128, 1, 1);
+    dim3 DimGrid(ceil((float) Height_out * Width_out / TILE_WIDTH), ceil((float) Map_out / TILE_WIDTH), Batch);
+    dim3 DimBlock(TILE_WIDTH, TILE_WIDTH, 1);
     matmul_conv_fused<<<DimGrid, DimBlock>>>(device_mask, device_input, device_output, Batch, Map_out, Channel, Height, Width, K);
 }
 __host__ void GPUInterface::conv_forward_gpu_epilog(float *host_output, float *device_output, float *device_input, float *device_mask, const int Batch, const int Map_out, const int Channel, const int Height, const int Width, const int K)
